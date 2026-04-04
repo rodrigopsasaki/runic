@@ -1,0 +1,3 @@
+#!/bin/bash
+# Script with no file extension
+echo "no-extension"
