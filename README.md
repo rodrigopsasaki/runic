@@ -1,577 +1,231 @@
-# 🤖 Rodrigo's CLI (rc)
+# rc
 
-A developer-first CLI framework that makes local commands feel native — like they were always part of your environment. Built with XDG compliance, theme-aware colors, and a delightful developer experience.
-
-## ✨ Features
-
-- **🎯 Zero boilerplate**: Drop a script into a folder and it works instantly
-- **📁 Directory-based extensions**: Recursively scan and register commands
-- **🔄 Runtime-agnostic**: Support for Node.js, TypeScript, Bash, Python, Ruby, PHP
-- **⚙️ Sidecar configs**: Optional YAML/JSON metadata for enhanced functionality
-- **🏷️ Command aliases**: Define multiple ways to call the same command
-- **📋 Directory-level configs**: Command groups with their own descriptions and options
-- **🔀 Command wrapping**: Extend existing tools (like npm) with custom commands
-- **🔍 First-class autocomplete**: Tab completion for all shells (zsh, bash, fish)
-- **🎨 Theme-aware colors**: Automatic dark/light terminal detection
-- **📊 XDG compliance**: Follows XDG Base Directory Specification
-- **🐛 Debug mode**: Built-in verbose logging for troubleshooting
-- **🎭 Dad jokes**: Because why not?
-
-## 🚀 Quick Start
-
-### Installation
-
-#### Option 1: One-liner (Recommended)
+Turn any script folder into a CLI.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rodrigopsasaki/rodrigos-cli/main/install.sh | bash
+eval "$(rc init zsh --name ops --dir ~/scripts)"
 ```
 
-#### Option 2: Manual installation
+```
+~/scripts/
+├── deploy.sh
+├── rollback.py
+└── db/
+    ├── backup.sh
+    └── migrate.rb
+```
+
+```
+$ ops deploy production
+$ ops db backup --full
+$ ops help
+```
+
+Scripts can be in any language. Directories become subcommands. File names become command names.
+
+## How it works
+
+`rc` generates a shell function with the name you choose. That function does all the dispatching — no Node.js startup on every invocation, no manifest to maintain, no config files. It probes the filesystem directly, finds your script, detects the runtime from the file extension, and runs it.
+
+The generated function handles everything: command dispatch, help, doctor diagnostics, tab completions. You interact with your CLI, not with `rc`.
+
+## Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/rodrigopsasaki/rodrigos-cli.git
-cd rodrigos-cli
-
-# Run the installer
-./install.sh
+npm install -g rodrigos-cli
 ```
 
-#### Option 3: Using npm scripts
+## Setup
+
+Add one line to your shell config (`.zshrc`, `.bashrc`, or `config.fish`):
 
 ```bash
-# Clone and setup
-git clone https://github.com/rodrigopsasaki/rodrigos-cli.git
-cd rodrigos-cli
-npm run setup
+# zsh
+eval "$(rc init zsh --name ops --dir ~/scripts)"
+
+# bash
+eval "$(rc init bash --name ops --dir ~/scripts)"
+
+# fish
+rc init fish --name ops --dir ~/scripts | source
 ```
 
-### 🔗 Immutable Entrypoint System
+That's it. You now have a CLI called `ops`.
 
-rc uses an innovative **immutable entrypoint system** that ensures your CLI installation is always up-to-date and self-healing:
+## Supported runtimes
 
-#### How it works:
+| Extension | Runner    |
+|-----------|-----------|
+| `.sh`     | bash      |
+| `.bash`   | bash      |
+| `.zsh`    | zsh       |
+| `.py`     | python3   |
+| `.rb`     | ruby      |
+| `.js`     | node      |
+| `.ts`     | npx tsx   |
+| `.php`    | php       |
+| `.pl`     | perl      |
+| (none)    | shebang   |
 
-1. **Immutable Entrypoint**: The installer creates `~/.local/bin/rc-immutable` - a script that always points to the latest version
-2. **Smart Symlink**: The `rc` command is a symlink that points to `rc-immutable`
-3. **Self-Updating**: The immutable entrypoint can update itself and the underlying installation
-4. **Future-Proof**: Even if you have an "outdated" symlink, it will still work and can self-update
+Extensionless files with a shebang line are supported — the runtime is read from the shebang.
 
-#### Benefits:
+## Descriptions
 
-- **🔄 Self-Healing**: Outdated installations automatically get the latest features
-- **🛡️ Reliable**: The symlink never breaks, even across major updates
-- **⚡ Seamless**: Updates happen transparently without manual intervention
-- **🔧 Smart**: Detects development vs production environments
-
-#### Example scenario:
-
-```bash
-# User installs rc v1.0 (without --update feature)
-curl -fsSL https://raw.githubusercontent.com/rodrigopsasaki/rodrigos-cli/main/install.sh | bash
-
-# Later, rc v2.0 is released with --update feature
-# The user's symlink still works because it points to rc-immutable
-rc --update  # This works! The immutable entrypoint has the new feature
-```
-
-#### Updating:
-
-```bash
-# Update to the latest version
-rc --update
-
-# Or manually reinstall
-curl -fsSL https://raw.githubusercontent.com/rodrigopsasaki/rodrigos-cli/main/install.sh | bash
-```
-
-### First Run
-
-After installation, run `rc` to see your current configuration:
-
-```bash
-rc
-```
-
-This will show:
-- Configuration file location
-- Extensions directory
-- Available extensions
-- Quick start commands
-
-### Setup Extensions
-
-Create example extensions and XDG-compliant directory structure:
-
-```bash
-rc --setup
-```
-
-This will:
-- Create XDG directory structure (`~/.config/rc/`, `~/.local/share/rc/`, etc.)
-- Copy example extensions
-- Create comprehensive configuration file
-- Set up proper file organization
-
-### Shell Completion
-
-Add shell completion for the best experience:
-
-```bash
-# For zsh
-eval "$(rc completion zsh)"
-
-# For bash
-eval "$(rc completion bash)"
-
-# For fish
-eval "$(rc completion fish)"
-```
-
-## 📁 XDG Directory Structure
-
-rc follows the XDG Base Directory Specification for proper file organization:
-
-```
-~/.config/rc/                    # Configuration files
-├── config.yaml                  # Main configuration
-└── ...
-
-~/.local/share/rc/               # Data files
-├── extensions/                  # Your custom extensions
-│   ├── gen/
-│   │   ├── gen.yaml            # Directory-level config
-│   │   ├── uuid.cjs
-│   │   ├── uuid.yaml
-│   │   ├── objectid.sh
-│   │   ├── objectid.yaml
-│   │   ├── rstring.sh
-│   │   └── rstring.yaml
-│   ├── npm/
-│   │   ├── npm.yaml            # npm wrapper config
-│   │   ├── show-scripts.sh     # Custom npm command
-│   │   └── show-scripts.yaml   # With aliases: [ss]
-│   ├── git/
-│   │   ├── aliases.sh
-│   │   └── aliases.yaml
-│   └── aws/
-│       ├── s3/
-│       │   ├── sync.sh
-│       │   └── sync.yaml
-│       └── ec2/
-│           ├── list.js
-│           └── list.yaml
-
-~/.cache/rc/                     # Cache files (future use)
-└── ...
-
-~/.local/state/rc/               # State files (future use)
-└── ...
-```
-
-This creates commands like:
-- `rc gen uuid`
-- `rc gen objectid`
-- `rc gen rstring`
-- `rc npm show-scripts` / `rc npm ss` (with alias)
-- `rc git aliases`
-- `rc aws s3 sync`
-- `rc aws ec2 list`
-
-
-## ⚙️ Supported Runtimes
-
-| Extension | Runner  | Example           |
-| --------- | ------- | ----------------- |
-| `.js`     | Node.js | `runner: node`    |
-| `.ts`     | tsx     | `runner: tsx`     |
-| `.sh`     | bash    | `runner: bash`    |
-| `.py`     | python3 | `runner: python3` |
-| `.rb`     | ruby    | `runner: ruby`    |
-| `.php`    | php     | `runner: php`     |
-
-## 📋 Sidecar Configuration
-
-Every script can have an optional sidecar YAML/JSON file for metadata:
-
-```yaml
-# example.yaml
-description: What this command does
-runner: node
-passContext: true
-aliases:
-  - short-name
-  - alias2
-options:
-  - name: profile
-    type: string
-    description: Environment profile
-    suggestions: [dev, prod, staging]
-    required: true
-  - name: verbose
-    type: boolean
-    description: Enable verbose output
-    short: v
-```
-
-### Directory-Level Configuration
-
-Command groups can have their own sidecar configs:
-
-```yaml
-# gen/gen.yaml
-description: Generate various types of data (UUIDs, ObjectIDs, random strings)
-options:
-  - name: help
-    type: string
-    description: Show help for specific generator
-```
-
-This gives the `gen` command its own description and options, separate from its child commands.
-
-### Configuration Options
-
-- **description**: Help text for the command
-- **runner**: Override the default runtime
-- **passContext**: Pass execution context as JSON to stdin
-- **aliases**: Array of alternative names for the command
-- **options**: Define command-line options with validation
-
-## 🎯 Environment Variables
-
-Extensions receive context through environment variables:
-
-- `RC_COMMAND`: Full command path (e.g., "aws s3 sync")
-- `RC_SCRIPT_PATH`: Path to the executing script
-- `RC_SCRIPT_TYPE`: Script type (js, ts, sh, py, rb, php)
-- `RC_<OPTION_NAME>`: Any command-line options
-
-## 🧪 Example Extensions
-
-### Shell Script with Context
+The first comment after the shebang becomes the command's description in `help` output:
 
 ```bash
 #!/bin/bash
-# ~/.local/share/rc/extensions/deploy.sh
-
-echo "Deploying to environment: $RC_PROFILE"
-echo "Command: $RC_COMMAND"
-
-# Access context as JSON if passContext is enabled
-if [ -t 0 ]; then
-  echo "No context provided"
-else
-  context=$(cat)
-  echo "Context: $context"
-fi
+# Deploy the application to the target environment
 ```
 
-### Node.js Extension
+```python
+#!/usr/bin/env python3
+# Run database migrations
+```
 
 ```javascript
 #!/usr/bin/env node
-// ~/.local/share/rc/extensions/secret.js
-
-import { randomBytes } from "crypto";
-
-const length = process.env.RC_LENGTH || 32;
-const secret = randomBytes(parseInt(length)).toString("hex");
-console.log(secret);
+// Rotate API keys for all services
 ```
 
-### Python Extension
+No config files needed. Your scripts document themselves.
 
-```python
-#!/usr/bin/bin/python3
-# ~/.local/share/rc/extensions/weather.py
+## Multiple directories
 
-import os
-import sys
-import json
-
-city = os.environ.get('RC_CITY', 'San Francisco')
-print(f"Weather in {city}: Sunny with a chance of code reviews! ☀️")
-
-# Read context from stdin if provided
-if not sys.stdin.isatty():
-    context = json.load(sys.stdin)
-    print(f"Context: {context}")
-```
-
-## ⚙️ Configuration
-
-Configuration is stored following the XDG Base Directory Specification:
+Point at multiple directories. First directory wins on conflict.
 
 ```bash
-# Default location
-~/.config/rc/config.yaml
-
-# Example configuration
-extensionsDir: ~/.local/share/rc/extensions
-defaultRunner: node
-enableLogging: true
-darkMode: null  # Auto-detect terminal theme
+eval "$(rc init zsh --name ops --dir ~/my-scripts --dir /shared/team-scripts)"
 ```
 
-### Configuration Options
+This lets teams share a script repo while individuals add their own overrides.
 
-- **extensionsDir**: Directory where your extensions are stored
-- **defaultRunner**: Default script runner (node, python, ruby, php, bash, sh)
-- **enableLogging**: Enable/disable debug logging
-- **darkMode**: Theme mode (true=dark, false=light, null=auto-detect)
+## Whitelabeling
 
-## 🎨 Theme Support
-
-rc automatically detects your terminal theme and adjusts colors accordingly:
-
-- **Dark terminals**: Uses brighter colors for better visibility
-- **Light terminals**: Uses darker colors for contrast
-- **Configurable**: Override with `darkMode` setting in config
-- **Environment-aware**: Respects terminal environment variables
-
-## 🎭 Commands
-
-### Core Commands
-
-- `rc` - Show configuration info and quick start commands
-- `rc help` - Show all available commands recursively (includes aliases)
-- `rc completion <shell>` - Generate shell completion script
-- `rc --setup` - Create example extensions and XDG directory structure
-- `rc --config` - Show detailed configuration and XDG directory info
-- `rc --migrate` - Show XDG directory structure and benefits
-- `rc --joke` - Show a dad joke
-- `rc --verbose` / `rc --debug` - Enable debug logging
-
-### Extension Commands
-
-All commands discovered from your extensions directory are automatically available with full help and autocomplete support.
-
-## 🏷️ Command Aliases
-
-### Sidecar Aliases
-
-Define multiple ways to call the same command using sidecar YAML files:
-
-```yaml
-# show-scripts.yaml
-description: Show available npm scripts in a nice format
-runner: bash
-aliases:
-  - ss
-  - scripts
-```
-
-This creates multiple commands that all execute the same script:
-- `rc npm show-scripts`
-- `rc npm ss` 
-- `rc npm scripts`
-
-All aliases are automatically:
-- **Discoverable**: Shown in help output with proper formatting
-- **Auto-completed**: Tab completion works for all variations
-- **Conflict-aware**: The `rc doctor` command detects naming conflicts
-
-### Example: npm Extension with Aliases
+The `--name` flag is the CLI's identity. Create as many as you want:
 
 ```bash
-# Create npm extension directory
-mkdir -p ~/.local/share/rc/extensions/npm
-
-# show-scripts.sh - Custom npm command
-#!/bin/bash
-echo "📦 Available npm scripts:"
-# ... script content ...
-
-# show-scripts.yaml - Configuration with alias
-description: Show available npm scripts in a nice format
-runner: bash
-aliases:
-  - ss
+eval "$(rc init zsh --name ops --dir ~/scripts/ops)"
+eval "$(rc init zsh --name dev --dir ~/scripts/dev)"
+eval "$(rc init zsh --name infra --dir /opt/infra/scripts)"
 ```
 
-This creates:
-- `npm show-scripts` - Full command name
-- `npm ss` - Short alias
+Three separate CLIs. Three names. Independent.
 
-## 🔗 Smart Command Aliasing
+## Built-in commands
 
-Create intelligent wrappers that make rc commands feel native while preserving system functionality:
+Every generated CLI has these built-in:
+
+| Command | What it does |
+|---------|-------------|
+| `ops help` | List all commands with descriptions |
+| `ops doctor` | Check permissions, shebangs, runners |
+| `ops completions zsh` | Generate tab-completion script |
+
+These delegate to the `rc` binary for the heavy lifting (directory walking, formatting). Dispatch — the thing that runs 100 times a day — stays in the shell function at zero cost.
+
+## Tab completions
+
+Generate and load completions for your shell:
 
 ```bash
-# Create command wrappers
-rc alias gen             # Creates 'gen' wrapper for all gen commands
-rc alias npm             # Creates 'npm' wrapper that extends system npm
+# zsh — add to .zshrc after the eval line
+source <(ops completions zsh)
 
-# Set up all aliases at once
-eval "$(rc alias-init)"  # Automatically configures all aliasable commands
+# bash
+eval "$(ops completions bash)"
 
-# Now use them directly
-gen uuid                 # Runs: rc gen uuid
-npm ss                   # Runs: rc npm ss (custom command)
-npm install react       # Runs: system npm install react (passes through)
+# fish
+ops completions fish | source
 ```
 
-**How it works**: 
-- `rc alias <command>` creates intelligent wrapper scripts that route custom commands to rc and pass unknown commands to system binaries
-- `rc alias-init` discovers all aliasable directories and outputs shell aliases to set them all up at once
-- Wrappers automatically detect whether a command is custom (handled by rc) or standard (passed to system)
-
-**Perfect for**:
-- **Command extension**: Add custom commands to existing tools (like npm, git, docker)
-- **Seamless workflow**: Custom commands feel native, standard commands work unchanged  
-- **Team productivity**: Share enhanced tooling without breaking existing workflows
-- **One-command setup**: `eval "$(rc alias-init)"` configures everything automatically
-
-## 🔀 Command Wrapping & Extension
-
-Extend existing command-line tools by creating rc extensions that add functionality while preserving original behavior.
-
-### Example: Extending npm
-
-Create a comprehensive npm extension that adds custom commands while passing through standard npm functionality:
+## Scaffolding new scripts
 
 ```bash
-# 1. Create npm extension directory
-mkdir -p ~/.local/share/rc/extensions/npm
-
-# 2. Add custom commands with aliases
-cat > ~/.local/share/rc/extensions/npm/show-scripts.yaml << 'EOF'
-description: Show available npm scripts in a nice format
-runner: bash
-aliases:
-  - ss
-EOF
-
-cat > ~/.local/share/rc/extensions/npm/show-scripts.sh << 'EOF'
-#!/bin/bash
-echo "📦 Available npm scripts:"
-node -e "
-  const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
-  if (!pkg.scripts) { console.log('   No scripts found'); process.exit(0); }
-  Object.entries(pkg.scripts).forEach(([name, cmd]) => {
-    console.log(\`   🚀 \${name.padEnd(15)} → \${cmd}\`);
-  });
-"
-EOF
-
-chmod +x ~/.local/share/rc/extensions/npm/show-scripts.sh
-
-# 3. Create npm wrapper and set up aliases
-rc alias npm                    # Creates intelligent npm wrapper
-eval "$(rc alias-init)"         # Sets up all aliases automatically
+rc create scripts/deploy.sh      # creates with #!/bin/bash
+rc create scripts/analyze.py     # creates with #!/usr/bin/env python3
+rc create scripts/serve.js       # creates with #!/usr/bin/env node
 ```
 
-**Result**: 
-- `npm show-scripts` / `npm ss` - Custom enhanced command
-- `npm install`, `npm run`, etc. - Pass through to real npm
-- All standard npm functionality preserved
-- Enhanced with custom commands and better UX
-- **One command setup**: All aliases configured automatically
+Creates the file with the right shebang, a description placeholder, and executable permissions.
 
-### How Command Wrapping Works
+## Environment variables
 
-1. **Extension Discovery**: rc finds your custom commands in the npm directory
-2. **Wrapper Creation**: `rc alias npm` creates an intelligent wrapper script
-3. **Automatic Setup**: `eval "$(rc alias-init)"` discovers and configures all wrappers
-4. **Intelligent Routing**: 
-   - Known custom commands → Execute your scripts via rc
-   - Unknown commands → Pass through to real system binary
-5. **Seamless Integration**: Works exactly like the original tool with enhanced functionality
+Every script receives context through environment variables:
 
-### Use Cases
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `RC_COMMAND` | `db backup` | The command path as typed |
+| `RC_CLI_NAME` | `ops` | The CLI name |
+| `RC_SCRIPT_PATH` | `/home/you/scripts/db/backup.sh` | Absolute path to the script |
+| `RC_DIR` | `/home/you/scripts` | Which directory this script was found in |
+| `RC_DIRS` | `/home/you/scripts:/shared/scripts` | All directories (colon-separated) |
 
-- **Enhanced git**: Add custom workflows while keeping all git commands
-- **Better docker**: Add shortcuts and utilities to docker
-- **Custom kubectl**: Add cluster-specific shortcuts to Kubernetes commands
-- **Team tools**: Create standardized commands that extend company tools
+Scripts can detect they're running inside a generated CLI by checking for `RC_COMMAND`.
 
-## 🧪 Development
+## Command resolution
 
-### Local Development
+`rc` uses greedy longest-match. Given `ops deploy staging`:
+
+1. Try `<dir>/deploy/staging.{sh,py,js,...}` — if found, run it
+2. Try `<dir>/deploy.{sh,py,js,...}` with `staging` as an argument
+
+This means a script and a directory can coexist with the same name:
+
+```
+scripts/
+├── deploy.sh           # ops deploy
+└── deploy/
+    └── staging.sh      # ops deploy staging
+```
+
+Both work. The longer match wins when it exists.
+
+## Extension probe order
+
+When two scripts share a base name with different extensions (e.g., `deploy.sh` and `deploy.py`), the first match in probe order wins:
+
+`sh, bash, zsh, py, rb, js, ts, php, pl`
+
+`ops doctor` will flag this as a conflict.
+
+## Example: team CLI
+
+A platform team maintains shared scripts in a git repo:
+
+```
+platform-tools/
+├── deploy/
+│   ├── staging.sh
+│   ├── production.sh
+│   └── rollback.py
+├── db/
+│   ├── backup.sh
+│   ├── restore.sh
+│   └── migrate.rb
+└── monitoring/
+    ├── check-disk.sh
+    └── restart-service.sh
+```
+
+Each team member adds to their `.zshrc`:
 
 ```bash
-# Clone and install
+eval "$(rc init zsh --name plat --dir ~/repos/platform-tools --dir ~/my-scripts)"
+```
+
+The Perl dev, the Python dev, and the bash purist all contribute scripts in their language. Nobody has to agree on a runtime. The `~/my-scripts` directory lets individuals add overrides or personal utilities without touching the shared repo.
+
+## Development
+
+```bash
 git clone https://github.com/rodrigopsasaki/rodrigos-cli.git
 cd rodrigos-cli
-npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
+pnpm install
+pnpm test        # 71 tests
+pnpm run build   # produces dist/rc.cjs
 ```
 
-### Quick Setup for Development
+## License
 
-```bash
-# Install and setup for development
-npm run setup
-
-# Test the CLI
-rc
-rc help
-rc gen uuid
-```
-
-### Testing Extensions
-
-The CLI uses the `examples/extensions/` directory for testing during development. You can add your test extensions there.
-
-### Uninstalling
-
-```bash
-# Remove the CLI
-npm run uninstall
-
-# Or manually
-rm ~/.local/bin/rc
-rm -rf ~/.local/bin/rodrigos-cli
-```
-
-## 🏗️ Architecture
-
-```
-src/
-├── bin/rc.ts                    # Main CLI entry point
-├── core/
-│   ├── config-manager.ts        # XDG-aware configuration management
-│   ├── extension-loader.ts      # Extension discovery & execution
-│   └── completion-service.ts    # Autocomplete engine
-├── types/index.ts               # TypeScript definitions
-└── utils/
-    ├── xdg-paths.ts            # XDG Base Directory implementation
-    ├── chalk.ts                # Theme-aware styling utilities
-    └── dad-joke-service.ts     # Dad joke provider
-```
-
-## 🔧 XDG Base Directory Specification
-
-rc follows the XDG Base Directory Specification for proper file organization:
-
-- **XDG_CONFIG_HOME**: `~/.config/rc/` (configuration files)
-- **XDG_DATA_HOME**: `~/.local/share/rc/` (extensions and data)
-- **XDG_CACHE_HOME**: `~/.cache/rc/` (cache files)
-- **XDG_STATE_HOME**: `~/.local/state/rc/` (state files)
-
-This ensures:
-- Proper integration with Linux/Unix systems
-- User control via environment variables
-- Clear separation of concerns
-- Standards compliance
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## 📄 License
-
-MIT © [Rodrigo Sasaki](https://github.com/rodrigopsasaki)
+MIT
