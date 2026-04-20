@@ -1,27 +1,41 @@
 # runic
 
-Turn any script folder into a CLI.
+**Point a CLI at a folder. Drop in scripts. They become commands.**
+
+That's the whole idea.
 
 ```bash
 eval "$(runic init zsh --name ops --dir ~/scripts)"
 ```
 
+Now your folder *is* a CLI:
+
 ```
-~/scripts/
-├── deploy.sh
-├── rollback.py
-└── db/
+~/scripts/                      $ ops deploy production
+├── deploy.sh             →     $ ops db backup --full
+├── rollback.py                 $ ops rollback
+└── db/                         $ ops help
     ├── backup.sh
     └── migrate.rb
 ```
 
-```
-$ ops deploy production
-$ ops db backup --full
-$ ops help
+### Want a new command? Drop a file.
+
+```bash
+$ cat > ~/scripts/logs.sh <<'SCRIPT'
+#!/bin/bash
+# Tail nginx access logs
+tail -f /var/log/nginx/access.log
+SCRIPT
+
+$ chmod +x ~/scripts/logs.sh
+
+$ ops logs    # live. no reload, no registration, no restart.
 ```
 
-Scripts can be in any language. Directories become subcommands. File names become command names.
+No manifest. No config file. The shell function reads the filesystem on every invocation, so the CLI is always whatever's currently on disk.
+
+Scripts can be in any language. Directories become subcommands. Filenames become command names.
 
 ## How it works
 
