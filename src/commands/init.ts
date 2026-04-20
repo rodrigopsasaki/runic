@@ -10,9 +10,16 @@ interface InitOptions {
   readonly shell: string;
   readonly name: string;
   readonly dirs: readonly string[];
+  readonly allowBinaries: boolean;
 }
 
-const GENERATORS: Readonly<Record<Shell, (opts: { name: string; dirs: readonly string[] }) => string>> = {
+interface GeneratorOptions {
+  readonly name: string;
+  readonly dirs: readonly string[];
+  readonly allowBinaries: boolean;
+}
+
+const GENERATORS: Readonly<Record<Shell, (opts: GeneratorOptions) => string>> = {
   zsh: generateZshFunction,
   bash: generateBashFunction,
   fish: generateFishFunction,
@@ -23,7 +30,7 @@ const GENERATORS: Readonly<Record<Shell, (opts: { name: string; dirs: readonly s
  * Outputs the function to stdout for use with `eval "$(runic init ...)"`.
  */
 export function init(options: InitOptions): void {
-  const { shell, name, dirs } = options;
+  const { shell, name, dirs, allowBinaries } = options;
 
   if (!shell) {
     throw new CliError("runic init", "shell argument is required (zsh, bash, or fish)");
@@ -41,7 +48,7 @@ export function init(options: InitOptions): void {
     throw new CliError("runic init", `unsupported shell "${shell}". Use ${SUPPORTED_SHELLS.join(", ")}.`);
   }
 
-  process.stdout.write(GENERATORS[shell]({ name, dirs }));
+  process.stdout.write(GENERATORS[shell]({ name, dirs, allowBinaries }));
 }
 
 function isSupportedShell(shell: string): shell is Shell {

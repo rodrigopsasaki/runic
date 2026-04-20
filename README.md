@@ -38,11 +38,17 @@ $ ops pr    # live. no reload, no registration, no restart.
 
 No manifest. No config file. The shell function reads the filesystem on every invocation, so the CLI is always whatever's currently on disk.
 
-Scripts can be in any language. Directories become subcommands. Filenames become command names.
+Scripts can be in any language. Directories become subcommands. Filenames become command names. And if you [opt in](#native-binaries), native executables (Rust, Go, C, anything the kernel can run) drop into the same folder as first-class commands — compiled speed tier, right next to your bash one-liners.
 
 ## How it works
 
-`runic` generates a shell function with the name you choose. That function does all the dispatching — no Node.js startup on every invocation, no manifest to maintain, no config files. It probes the filesystem directly, finds your script, detects the runtime from the file extension, and runs it.
+`runic` generates a shell function with the name you choose. That function does all the dispatching — no Node.js startup on every invocation, no manifest to maintain, no config files. It probes the filesystem directly, finds the file that matches your command, and runs it.
+
+*How* it runs the file depends on what the file is:
+
+- **Known extension** (`.sh`, `.py`, `.rb`, `.js`, `.ts`, …) — invoked via the mapped interpreter.
+- **Extensionless with a shebang** — the shebang picks the interpreter.
+- **Extensionless and executable** (opt-in via `--allow-binaries`) — exec'd directly. Native binaries run at kernel speed with no interpreter in the loop.
 
 The generated function handles everything: command dispatch, help, doctor diagnostics, tab completions. You interact with your CLI, not with `runic`.
 
@@ -71,7 +77,11 @@ runic init fish --name ops --dir ~/scripts | source
 
 That's it. You now have a CLI called `ops`.
 
+Append `--allow-binaries` to also dispatch native executables from your script dir. Off by default — see [Native binaries](#native-binaries) for why.
+
 ## Supported runtimes
+
+Most of what lands in your script dir is interpreted. runic knows the common extensions and invokes the right runner automatically:
 
 | Extension | Runner    |
 |-----------|-----------|
@@ -84,9 +94,28 @@ That's it. You now have a CLI called `ops`.
 | `.ts`     | npx tsx   |
 | `.php`    | php       |
 | `.pl`     | perl      |
-| (none)    | shebang   |
 
-Extensionless files with a shebang line are supported — the runtime is read from the shebang.
+Extensionless files with a shebang line work too — the interpreter is read from the shebang. So `#!/usr/bin/env python3` or `#!/usr/bin/env -S python3 -u` both resolve correctly with no extension in the filename.
+
+Run `runic runtimes` to see which of these are installed on the current host, with versions.
+
+### Native binaries
+
+Off by default. Pass `--allow-binaries` at init and runic will also dispatch extensionless *executables* — Mach-O, ELF, or any other format the kernel knows how to `execve`. Your Rust CLI, your Go tool, your hand-compiled C util: drop the binary in the script dir, it's a command.
+
+```bash
+eval "$(runic init zsh --name ops --dir ~/scripts --allow-binaries)"
+```
+
+**Why opt-in?** Shell scripts are readable source. You can open `~/scripts/lint.sh` and see exactly what it does before running it. Binaries are opaque — you're trusting the bytes. Making it a conscious flag means you've thought about whose bytes you're running, not just which folder they live in.
+
+Per-call override without re-init:
+
+```bash
+__runic_allow_binaries=1 ops fastgrep foo    # one-off, still off by default
+```
+
+In `help` and `doctor`, binaries show up as `binary` instead of a description — there's no shebang to read a comment from. `doctor` also skips the missing-shebang and runner-availability checks for binaries, since they're their own runner.
 
 ## Descriptions
 
@@ -148,7 +177,7 @@ runic dispatches by reading the filesystem on every invocation. The consequences
 
 - **Shell-native everything.** runic `exec`s your scripts, so they inherit how Unix already works: arg quoting, pipes (`ops logs | grep ERROR`), redirection, signals, TTY detection, exit codes, process groups, job control.
 - **Login state, sudo prompts, file locks, tmux sessions.** Scripts can `ssh-add`, prompt for `sudo`, hold a flock, attach to a tmux session — anything any other shell process can do.
-- **Polyglot.** bash, python, node, ruby, typescript, perl, php — any combination in the same CLI.
+- **Polyglot.** bash, python, node, ruby, typescript, perl, php — any combination in the same CLI. With `--allow-binaries`, native executables (Rust, Go, C, …) drop into the same folder and run at kernel speed, no interpreter in the loop.
 - **No registration step.** Scripts on disk are the source of truth; there's no manifest. `ops help` and tab completions are generated from the filesystem.
 - **Each script is independent.** No framework coupling between commands. Delete one, the others still work. A broken script doesn't take down the CLI.
 - **Descriptions come from comments.** The first comment after the shebang is what `ops help` prints for that command.
@@ -162,6 +191,7 @@ runic dispatches by reading the filesystem on every invocation. The consequences
 - **Auto-help is minimal.** One-line description per command; no generated usage / options / examples. Scripts that need rich help implement their own `--help`.
 - **Refactor cost is filesystem cost.** Rename `db/` to `database/` and the command name moves with it. There's no manifest layer insulating command names from file paths.
 - **Distribution still requires runic.** Sharing your CLI means sharing the script folder and asking the recipient to install runic and `eval` the init line. There's no single-binary pack.
+- **Binaries are opaque.** Source-code scripts can be inspected before they run; compiled executables can't. `--allow-binaries` puts that tradeoff in your hands rather than hiding it — enable it for dirs whose contents you trust, leave it off for dirs you don't.
 
 Have an idea for addressing one of the downsides without changing the core model? [Open an issue](https://github.com/rodrigopsasaki/runic/issues) and let's talk.
 
@@ -280,18 +310,21 @@ platform-tools/
 │   ├── client.sh            # Generate typed API client from OpenAPI
 │   ├── component.js         # Scaffold a new React component
 │   └── service.rb           # Scaffold a new microservice from template
-└── docs/
-    ├── serve.sh             # Run the docs site locally
-    └── lint.py              # Check docs for broken links
+├── docs/
+│   ├── serve.sh             # Run the docs site locally
+│   └── lint.py              # Check docs for broken links
+└── bin/
+    └── fastgrep             # Rust binary for ripgrep-speed search
+                             # (platform team vetted; opt-in with --allow-binaries)
 ```
 
 Each team member adds to their `.zshrc`:
 
 ```bash
-eval "$(runic init zsh --name plat --dir ~/repos/platform-tools --dir ~/my-scripts)"
+eval "$(runic init zsh --name plat --dir ~/repos/platform-tools --dir ~/my-scripts --allow-binaries)"
 ```
 
-The Perl dev, the Python dev, and the bash purist all contribute scripts in their language. Nobody has to agree on a runtime. The `~/my-scripts` directory lets individuals add overrides or personal utilities without touching the shared repo.
+The Perl dev, the Python dev, and the bash purist all contribute scripts in their language. Nobody has to agree on a runtime. The Rust-shop subgroup ships a few compiled helpers in `bin/` for anything that needs real throughput. The `~/my-scripts` directory lets individuals add overrides or personal utilities without touching the shared repo — and `--allow-binaries` is a platform-level decision, not a per-script one.
 
 ## Development
 

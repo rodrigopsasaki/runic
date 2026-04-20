@@ -6,6 +6,7 @@ interface CompletionsOptions {
   readonly shell: string;
   readonly name: string;
   readonly dirs: readonly string[];
+  readonly allowBinaries: boolean;
 }
 
 /**
@@ -13,7 +14,7 @@ interface CompletionsOptions {
  * The completions are generated from the current state of the script directories.
  */
 export function completions(options: CompletionsOptions): void {
-  const { shell, name, dirs } = options;
+  const { shell, name, dirs, allowBinaries } = options;
 
   if (!shell) {
     throw new CliError("runic completions", "shell argument is required (zsh, bash, or fish)");
@@ -23,7 +24,7 @@ export function completions(options: CompletionsOptions): void {
     throw new CliError("runic completions", "at least one --dir is required");
   }
 
-  const { scripts } = scan({ dirs });
+  const { scripts } = scan({ dirs, allowBinaries });
 
   switch (shell) {
     case "zsh":

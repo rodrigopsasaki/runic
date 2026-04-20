@@ -6,6 +6,12 @@ import { KNOWN_EXTENSIONS } from "./runner.js";
 interface ScanOptions {
   readonly dirs: readonly string[];
   readonly ignoreDotfiles?: boolean;
+  /**
+   * When true, extensionless executable files without shebangs are included as
+   * binary commands. Default false — binaries are opt-in because they're
+   * opaque (no source to inspect before they run).
+   */
+  readonly allowBinaries?: boolean;
 }
 
 /**
@@ -13,14 +19,14 @@ interface ScanOptions {
  * First directory in the list has highest priority (wins on conflict).
  */
 export function scan(options: ScanOptions): ScanResult {
-  const { dirs, ignoreDotfiles = true } = options;
+  const { dirs, ignoreDotfiles = true, allowBinaries = false } = options;
   const scriptMap = new Map<string, Script>();
   const conflictMap = new Map<string, string[]>();
 
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
 
-    const scripts = discoverScripts(dir, [], ignoreDotfiles);
+    const scripts = discoverScripts(dir, [], ignoreDotfiles, allowBinaries);
 
     for (const script of scripts) {
       const key = script.segments.join(" ");
@@ -92,7 +98,12 @@ export function extractDescription(filePath: string): string | undefined {
   }
 }
 
-function discoverScripts(dir: string, parentSegments: readonly string[], ignoreDotfiles: boolean): Script[] {
+function discoverScripts(
+  dir: string,
+  parentSegments: readonly string[],
+  ignoreDotfiles: boolean,
+  allowBinaries: boolean,
+): Script[] {
   const scripts: Script[] = [];
 
   let items: string[];
@@ -115,7 +126,7 @@ function discoverScripts(dir: string, parentSegments: readonly string[], ignoreD
     }
 
     if (stat.isDirectory()) {
-      const childScripts = discoverScripts(fullPath, [...parentSegments, item], ignoreDotfiles);
+      const childScripts = discoverScripts(fullPath, [...parentSegments, item], ignoreDotfiles, allowBinaries);
       scripts.push(...childScripts);
       continue;
     }
@@ -129,9 +140,18 @@ function discoverScripts(dir: string, parentSegments: readonly string[], ignoreD
     // Skip files with unknown extensions (like .bin, .yaml, .json, .md)
     if (!hasKnownExt && !hasNoExt) continue;
 
-    // For extensionless files, verify they have a shebang
+    let kind: "script" | "binary" = "script";
+
+    // Extensionless files need either a shebang (interpreted) or, with binaries
+    // opted in, the executable bit (native binary).
     if (hasNoExt) {
-      if (!hasShebang(fullPath)) continue;
+      if (hasShebang(fullPath)) {
+        kind = "script";
+      } else if (allowBinaries && (stat.mode & 0o111) !== 0) {
+        kind = "binary";
+      } else {
+        continue;
+      }
     }
 
     const commandName = hasKnownExt ? basename(item, `.${ext}`) : item;
@@ -141,7 +161,8 @@ function discoverScripts(dir: string, parentSegments: readonly string[], ignoreD
       segments,
       path: fullPath,
       ext: hasKnownExt ? ext : "",
-      description: extractDescription(fullPath),
+      description: kind === "binary" ? undefined : extractDescription(fullPath),
+      kind,
     });
   }
 

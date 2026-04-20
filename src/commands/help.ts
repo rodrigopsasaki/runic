@@ -6,9 +6,11 @@ import { CliError } from "../errors.js";
 interface HelpOptions {
   readonly name: string;
   readonly dirs: readonly string[];
+  readonly allowBinaries: boolean;
 }
 
 const NO_DESCRIPTION_PLACEHOLDER = "—";
+const BINARY_PLACEHOLDER = "binary";
 
 /**
  * Print a formatted list of all available commands discovered from the script directories.
@@ -16,13 +18,13 @@ const NO_DESCRIPTION_PLACEHOLDER = "—";
  * each script's first comment line.
  */
 export function help(options: HelpOptions): void {
-  const { name, dirs } = options;
+  const { name, dirs, allowBinaries } = options;
 
   if (dirs.length === 0) {
     throw new CliError("runic help", "at least one --dir is required");
   }
 
-  const { scripts } = scan({ dirs });
+  const { scripts } = scan({ dirs, allowBinaries });
 
   if (scripts.length === 0) {
     console.log(`\n  ${name}: no commands found.\n`);
@@ -75,15 +77,16 @@ function computeMaxCommandWidth(scripts: readonly Script[]): number {
   return scripts.reduce((max, s) => Math.max(max, s.segments.join(" ").length), 0);
 }
 
-function formatLine(cmd: string, description: string | undefined, width: number): string {
-  const desc = description ?? fmt.dim(NO_DESCRIPTION_PLACEHOLDER);
+function formatLine(script: Script, width: number): string {
+  const cmd = script.segments.join(" ");
+  const desc =
+    script.description ?? fmt.dim(script.kind === "binary" ? BINARY_PLACEHOLDER : NO_DESCRIPTION_PLACEHOLDER);
   return `${fmt.command(cmd.padEnd(width + 2))} ${desc}`;
 }
 
 function printTopLevel(scripts: readonly Script[], maxWidth: number): void {
   for (const script of scripts) {
-    const cmd = script.segments.join(" ");
-    console.log(`  ${formatLine(cmd, script.description, maxWidth)}`);
+    console.log(`  ${formatLine(script, maxWidth)}`);
   }
 }
 
@@ -91,8 +94,7 @@ function printGroups(groups: Map<string, Script[]>, maxWidth: number): void {
   for (const [group, groupScripts] of groups) {
     console.log(`  ${fmt.heading(group)}`);
     for (const script of groupScripts) {
-      const cmd = script.segments.join(" ");
-      console.log(`    ${formatLine(cmd, script.description, maxWidth)}`);
+      console.log(`    ${formatLine(script, maxWidth)}`);
     }
     console.log("");
   }

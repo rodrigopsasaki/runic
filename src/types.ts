@@ -1,13 +1,15 @@
-/** A discovered script in a directory. */
+/** A discovered executable in a directory — either a script or a native binary. */
 export interface Script {
   /** Command path segments, e.g. ["db", "backup"]. */
   readonly segments: readonly string[];
-  /** Absolute path to the script file. */
+  /** Absolute path to the file. */
   readonly path: string;
   /** File extension without the dot (e.g. "sh", "py"). Empty string if none. */
   readonly ext: string;
   /** Description extracted from the first comment after the shebang, if any. */
   readonly description: string | undefined;
+  /** "script" = interpreted (extension- or shebang-based runner). "binary" = native executable, no runner. */
+  readonly kind: "script" | "binary";
 }
 
 /** Result of scanning one or more directories. */

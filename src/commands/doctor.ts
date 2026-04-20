@@ -2,12 +2,13 @@ import { existsSync, statSync, readFileSync, readdirSync } from "fs";
 import { execFileSync } from "child_process";
 import { scan } from "../core/scanner.js";
 import { resolveRuntime } from "../core/runner.js";
-import type { DoctorIssue } from "../types.js";
+import type { DoctorIssue, Script } from "../types.js";
 import * as fmt from "../utils/format.js";
 import { CliError } from "../errors.js";
 
 interface DoctorOptions {
   readonly dirs: readonly string[];
+  readonly allowBinaries: boolean;
 }
 
 /**
@@ -16,7 +17,7 @@ interface DoctorOptions {
  * Prints a formatted report and exits with code 1 if errors are found.
  */
 export function doctor(options: DoctorOptions): void {
-  const { dirs } = options;
+  const { dirs, allowBinaries } = options;
 
   if (dirs.length === 0) {
     throw new CliError("runic doctor", "at least one --dir is required");
@@ -26,7 +27,7 @@ export function doctor(options: DoctorOptions): void {
 
   checkDirectories(dirs, issues);
 
-  const { scripts, conflicts } = scan({ dirs });
+  const { scripts, conflicts } = scan({ dirs, allowBinaries });
 
   checkScripts(scripts, issues);
   reportConflicts(conflicts, issues);
@@ -51,12 +52,15 @@ function checkDirectories(dirs: readonly string[], issues: DoctorIssue[]): void 
   }
 }
 
-function checkScripts(
-  scripts: readonly { readonly path: string; readonly ext: string }[],
-  issues: DoctorIssue[],
-): void {
+function checkScripts(scripts: readonly Script[], issues: DoctorIssue[]): void {
   for (const script of scripts) {
     checkExecutablePermission(script.path, issues);
+    if (script.kind === "binary") {
+      // Binaries don't have shebangs by design, and they ARE their own runner —
+      // skip both checks. Their existence with the executable bit was already
+      // validated by the scanner.
+      continue;
+    }
     checkShebang(script.path, script.ext, issues);
     checkRunnerAvailability(script.ext, script.path, issues);
   }
