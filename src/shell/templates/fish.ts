@@ -65,10 +65,13 @@ function ${name}
       test -n "$__runic_script"; and break
 
       if test -f "$__runic_base"; and not test -d "$__runic_base"
-        set __runic_script "$__runic_base"
-        set __runic_dir "$__runic_d"
-        set __runic_depth $__runic_i
-        break
+        # Require shebang for extensionless files to mirror Node-side scanner
+        if test (head -c 2 "$__runic_base" 2>/dev/null) = "#!"
+          set __runic_script "$__runic_base"
+          set __runic_dir "$__runic_d"
+          set __runic_depth $__runic_i
+          break
+        end
       end
     end
     test -n "$__runic_script"; and break
@@ -94,7 +97,15 @@ function ${name}
     case "*"
       set -l __runic_shebang (head -1 "$__runic_script" 2>/dev/null)
       if string match -q "#!/usr/bin/env *" "$__runic_shebang"
-        set __runic_runner (string replace "#!/usr/bin/env " "" "$__runic_shebang" | string split " ")[1]
+        # Strip prefix, then skip env flags (-S, -i, -vS, ...) and take first non-flag token
+        set -l __runic_parts (string replace "#!/usr/bin/env " "" "$__runic_shebang" | string split " ")
+        for __runic_part in $__runic_parts
+          if string match -q -- "-*" "$__runic_part"
+            continue
+          end
+          set __runic_runner $__runic_part
+          break
+        end
       else if string match -q "#!*" "$__runic_shebang"
         set __runic_runner (basename (string replace "#!" "" "$__runic_shebang" | string trim | string split " ")[1])
       else

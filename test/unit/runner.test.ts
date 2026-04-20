@@ -81,4 +81,21 @@ describe("parseShebang", () => {
 
     expect(actual).toBeUndefined();
   });
+
+  it("should skip env -S flag (modern shebangs that pass interpreter args)", () => {
+    const scriptPath = join(FIXTURES, "edge-cases", "shebang-env-S");
+
+    const actual = parseShebang(scriptPath);
+
+    expect(actual?.command).toBe("python3");
+    expect(actual?.args).toEqual(["-u"]);
+  });
+
+  it("should skip multiple env flags", () => {
+    const scriptPath = join(FIXTURES, "edge-cases", "shebang-env-multi-flags");
+
+    const actual = parseShebang(scriptPath);
+
+    expect(actual?.command).toBe("node");
+  });
 });

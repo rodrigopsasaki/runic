@@ -1,6 +1,6 @@
 {
   "name": "run-user-nested-invokable-commands",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Turn any script folder into a CLI",
   "bin": {
     "runic": "dist/runic.cjs"

@@ -50,9 +50,14 @@ export function parseShebang(filePath: string): RuntimeInfo | undefined {
     const shebang = firstLine.slice(2).trim();
     const parts = shebang.split(/\s+/);
 
-    // #!/usr/bin/env python3 -u → command: "python3", args: ["-u"]
-    if (parts[0] === "/usr/bin/env" && parts[1]) {
-      return { command: parts[1], args: parts.slice(2) };
+    // #!/usr/bin/env [-S|-i|-vS] python3 -u → skip env flags, command: "python3"
+    if (parts[0] === "/usr/bin/env") {
+      let i = 1;
+      while (parts[i]?.startsWith("-")) i++;
+      const command = parts[i];
+      if (command) {
+        return { command, args: parts.slice(i + 1) };
+      }
     }
 
     // #!/usr/bin/python3 → command: "python3", args: []

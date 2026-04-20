@@ -140,6 +140,8 @@ Every generated CLI has these built-in:
 
 These delegate to the `runic` binary for the heavy lifting (directory walking, formatting). Dispatch — the thing that runs 100 times a day — stays in the shell function at zero cost.
 
+> **Note:** `help`, `doctor`, `completions`, and `create` are reserved at the top level. A script literally named `help.sh` (or `doctor.sh`, etc.) at the root of your script folder will be unreachable — the built-in wins. Nest it (`scripts/admin/help.sh`) if you need that name.
+
 ## Tab completions
 
 Generate and load completions for your shell:

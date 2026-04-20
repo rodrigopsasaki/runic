@@ -66,11 +66,14 @@ function ${name}() {
       done
 
       if [[ -f "\$__runic_base" && ! -d "\$__runic_base" ]]; then
-        __runic_script="\$__runic_base"
-        __runic_dir="\$__runic_d"
-        __runic_depth=\$__runic_i
-        __runic_found=1
-        break 2
+        # Require shebang for extensionless files to mirror Node-side scanner
+        if [[ "\$(head -c 2 "\$__runic_base" 2>/dev/null)" == "#!" ]]; then
+          __runic_script="\$__runic_base"
+          __runic_dir="\$__runic_d"
+          __runic_depth=\$__runic_i
+          __runic_found=1
+          break 2
+        fi
       fi
     done
   done
@@ -95,8 +98,12 @@ function ${name}() {
       local __runic_shebang
       __runic_shebang=\$(head -1 "\$__runic_script" 2>/dev/null)
       if [[ "\$__runic_shebang" == "#!/usr/bin/env "* ]]; then
-        __runic_runner="\${__runic_shebang#\\#\\!/usr/bin/env }"
-        __runic_runner="\${__runic_runner%% *}"
+        # Strip prefix, then skip env flags (-S, -i, -vS, ...)
+        local __runic_rest="\${__runic_shebang#\\#\\!/usr/bin/env }"
+        while [[ "\$__runic_rest" == -* ]]; do
+          __runic_rest="\${__runic_rest#* }"
+        done
+        __runic_runner="\${__runic_rest%% *}"
       elif [[ "\$__runic_shebang" == "#!"* ]]; then
         __runic_runner="\${__runic_shebang#\\#\\!}"
         __runic_runner="\${__runic_runner## }"
